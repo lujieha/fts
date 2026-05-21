@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version="0.6" generator="fts-shp2osm">
+  <node id="-1" lon="116.3910000" lat="39.9070000" visible="true"/>
+  <node id="-2" lon="116.3920000" lat="39.9075000" visible="true"/>
+  <node id="-3" lon="116.3930000" lat="39.9080000" visible="true"/>
+  <node id="-4" lon="116.3915000" lat="39.9068000" visible="true"/>
+  <node id="-5" lon="116.3925000" lat="39.9072000" visible="true"/>
+
+  <!-- 车行道路：Valhalla auto costing 可使用 highway、oneway、maxspeed、motor_vehicle 等标签 -->
+  <way id="-1000001" visible="true">
+    <nd ref="-1"/>
+    <nd ref="-2"/>
+    <nd ref="-3"/>
+    <tag k="highway" v="primary"/>
+    <tag k="name" v="示例主路"/>
+    <tag k="oneway" v="yes"/>
+    <tag k="maxspeed" v="60"/>
+    <tag k="lanes" v="3"/>
+    <tag k="motor_vehicle" v="yes"/>
+    <tag k="ref:mesh" v="A123456789"/>
+    <tag k="ref:road_id" v="10001"/>
+    <tag k="source:feature" v="RoadSegment"/>
+  </way>
+
+  <!-- 步行道路：Valhalla pedestrian costing 可使用 foot/highway/steps/bridge/tunnel 等标签 -->
+  <way id="-1000002" visible="true">
+    <nd ref="-4"/>
+    <nd ref="-5"/>
+    <tag k="highway" v="footway"/>
+    <tag k="name" v="示例人行道"/>
+    <tag k="foot" v="yes"/>
+    <tag k="motor_vehicle" v="no"/>
+    <tag k="ref:mesh" v="A123456789"/>
+    <tag k="ref:walk_link_id" v="20001"/>
+    <tag k="source:feature" v="WALK_LINK"/>
+  </way>
+
+  <!-- 骑行道路：Valhalla bicycle costing 可使用 bicycle/cycleway/oneway:bicycle 等标签 -->
+  <way id="-1000003" visible="true">
+    <nd ref="-5"/>
+    <nd ref="-3"/>
+    <tag k="highway" v="cycleway"/>
+    <tag k="name" v="示例非机动车道"/>
+    <tag k="bicycle" v="yes"/>
+    <tag k="foot" v="yes"/>
+    <tag k="oneway:bicycle" v="no"/>
+    <tag k="motor_vehicle" v="no"/>
+    <tag k="ref:mesh" v="A123456789"/>
+    <tag k="ref:walk_link_id" v="20002"/>
+    <tag k="source:feature" v="WALK_LINK"/>
+  </way>
+</osm>
