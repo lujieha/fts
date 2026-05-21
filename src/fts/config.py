@@ -14,6 +14,10 @@ class InputPaths:
     walk: Optional[Path] = None
     road_node: Optional[Path] = None
     road_rule: Optional[Path] = None
+    road_node_maat: Optional[Path] = None
+    road_cross_maat: Optional[Path] = None
+    road_node_rule: Optional[Path] = None
+    road_cross_rule: Optional[Path] = None
 
     # Region-directory mode. A region consists of multiple mesh-named folders, and
     # each mesh folder contains its own shapefiles.
@@ -23,6 +27,10 @@ class InputPaths:
     walk_filename: str = "WALK_LINK.shp"
     road_node_filename: str = "RoadNodeRoadCross.shp"
     road_rule_filename: str = "RoadRule.shp"
+    road_node_maat_filename: str = "RoadNodeMaat.shp"
+    road_cross_maat_filename: str = "RoadCrossMaat.shp"
+    road_node_rule_filename: str = "RoadNodeRule.shp"
+    road_cross_rule_filename: str = "RoadCrossRule.shp"
 
     out_dir: Path = Path("out")
 
@@ -65,6 +73,7 @@ class RoutingDefaults:
     use_average_speed_as_maxspeed_fallback: bool = False
     use_speed_cate_as_maxspeed_fallback: bool = True
     apply_road_rules: bool = True
+    apply_turn_restrictions: bool = True
 
 
 @dataclass(frozen=True)
@@ -99,12 +108,20 @@ def load_config(path: str | Path) -> AppConfig:
             walk=_path_or_none(input_raw.get("walk")),
             road_node=_path_or_none(input_raw.get("road_node")),
             road_rule=_path_or_none(input_raw.get("road_rule")),
+            road_node_maat=_path_or_none(input_raw.get("road_node_maat")),
+            road_cross_maat=_path_or_none(input_raw.get("road_cross_maat")),
+            road_node_rule=_path_or_none(input_raw.get("road_node_rule")),
+            road_cross_rule=_path_or_none(input_raw.get("road_cross_rule")),
             region_dir=_path_or_none(input_raw.get("region_dir")),
             mesh_dir_glob=str(input_raw.get("mesh_dir_glob", "*")),
             road_filename=str(input_raw.get("road_filename", "RoadSegment.shp")),
             walk_filename=str(input_raw.get("walk_filename", "WALK_LINK.shp")),
             road_node_filename=str(input_raw.get("road_node_filename", "RoadNodeRoadCross.shp")),
             road_rule_filename=str(input_raw.get("road_rule_filename", "RoadRule.shp")),
+            road_node_maat_filename=str(input_raw.get("road_node_maat_filename", "RoadNodeMaat.shp")),
+            road_cross_maat_filename=str(input_raw.get("road_cross_maat_filename", "RoadCrossMaat.shp")),
+            road_node_rule_filename=str(input_raw.get("road_node_rule_filename", "RoadNodeRule.shp")),
+            road_cross_rule_filename=str(input_raw.get("road_cross_rule_filename", "RoadCrossRule.shp")),
             out_dir=Path(str(input_raw.get("out_dir", "out"))),
         ),
         output=OutputOptions(**{**OutputOptions().__dict__, **output_raw}),
