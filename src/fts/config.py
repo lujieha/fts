@@ -9,9 +9,22 @@ import yaml
 
 @dataclass(frozen=True)
 class InputPaths:
+    # Single-file mode. Useful for small tests or already-merged shapefiles.
     road: Optional[Path] = None
     walk: Optional[Path] = None
     road_node: Optional[Path] = None
+
+    # Region-directory mode. A region consists of multiple mesh-named folders, and
+    # each mesh folder contains its own shapefiles, for example:
+    #   data/region/5339456210/RoadSegment.shp
+    #   data/region/5339456210/WALK_LINK.shp
+    #   data/region/5339456210/RoadNodeRoadCross.shp
+    region_dir: Optional[Path] = None
+    mesh_dir_glob: str = "*"
+    road_filename: str = "RoadSegment.shp"
+    walk_filename: str = "WALK_LINK.shp"
+    road_node_filename: str = "RoadNodeRoadCross.shp"
+
     out_dir: Path = Path("out")
 
 
@@ -83,6 +96,11 @@ def load_config(path: str | Path) -> AppConfig:
             road=_path_or_none(input_raw.get("road")),
             walk=_path_or_none(input_raw.get("walk")),
             road_node=_path_or_none(input_raw.get("road_node")),
+            region_dir=_path_or_none(input_raw.get("region_dir")),
+            mesh_dir_glob=str(input_raw.get("mesh_dir_glob", "*")),
+            road_filename=str(input_raw.get("road_filename", "RoadSegment.shp")),
+            walk_filename=str(input_raw.get("walk_filename", "WALK_LINK.shp")),
+            road_node_filename=str(input_raw.get("road_node_filename", "RoadNodeRoadCross.shp")),
             out_dir=Path(str(input_raw.get("out_dir", "out"))),
         ),
         output=OutputOptions(**{**OutputOptions().__dict__, **output_raw}),
