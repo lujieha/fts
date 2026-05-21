@@ -1,8 +1,17 @@
 inputs:
-  road: "data/RoadSegment.shp"
-  walk: "data/WALK_LINK.shp"
-  # RoadNodeRoadCross 点表，用于基于 BOUNDARY + X_COORD/Y_COORD 建立跨 mesh node 连通关系。
-  road_node: "data/RoadNodeRoadCross.shp"
+  # 单文件模式：适用于测试或已经合并好的 shapefile。
+  road: ""
+  walk: ""
+  road_node: ""
+
+  # 区目录模式：一个区由多个以 mesh 命名的子文件夹组成。
+  # 示例：data/region/5339456210/RoadSegment.shp
+  region_dir: "data/region"
+  mesh_dir_glob: "*"
+  road_filename: "RoadSegment.shp"
+  walk_filename: "WALK_LINK.shp"
+  road_node_filename: "RoadNodeRoadCross.shp"
+
   out_dir: "out"
 
 output:
