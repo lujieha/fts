@@ -16,6 +16,7 @@ class MeshInputSet:
     road: Optional[Path] = None
     walk: Optional[Path] = None
     road_node: Optional[Path] = None
+    road_rule: Optional[Path] = None
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class DiscoveredInputs:
     road_files: List[Path]
     walk_files: List[Path]
     road_node_files: List[Path]
+    road_rule_files: List[Path]
     mesh_sets: List[MeshInputSet]
 
 
@@ -35,18 +37,7 @@ def _existing(path: Optional[Path]) -> List[Path]:
 
 
 def discover_mesh_inputs(config: AppConfig) -> List[MeshInputSet]:
-    """Discover shapefiles from a region directory containing mesh-named folders.
-
-    Directory layout expected by default:
-
-        <region_dir>/<mesh>/RoadSegment.shp
-        <region_dir>/<mesh>/WALK_LINK.shp
-        <region_dir>/<mesh>/RoadNodeRoadCross.shp
-
-    The mesh folder name is treated as the mesh id. The actual DBF `MESH` field is
-    still used as the authoritative mesh value when present. This fallback is useful
-    for incomplete or truncated DBF field exports.
-    """
+    """Discover shapefiles from a region directory containing mesh-named folders."""
     if not config.inputs.region_dir:
         return []
     region_dir = config.inputs.region_dir
@@ -58,7 +49,8 @@ def discover_mesh_inputs(config: AppConfig) -> List[MeshInputSet]:
         road = mesh_dir / config.inputs.road_filename
         walk = mesh_dir / config.inputs.walk_filename
         road_node = mesh_dir / config.inputs.road_node_filename
-        if not road.exists() and not walk.exists() and not road_node.exists():
+        road_rule = mesh_dir / config.inputs.road_rule_filename
+        if not road.exists() and not walk.exists() and not road_node.exists() and not road_rule.exists():
             continue
         mesh_sets.append(
             MeshInputSet(
@@ -67,6 +59,7 @@ def discover_mesh_inputs(config: AppConfig) -> List[MeshInputSet]:
                 road=road if road.exists() else None,
                 walk=walk if walk.exists() else None,
                 road_node=road_node if road_node.exists() else None,
+                road_rule=road_rule if road_rule.exists() else None,
             )
         )
     return mesh_sets
@@ -78,15 +71,18 @@ def discover_inputs(config: AppConfig) -> DiscoveredInputs:
     road_files = _existing(config.inputs.road)
     walk_files = _existing(config.inputs.walk)
     road_node_files = _existing(config.inputs.road_node)
+    road_rule_files = _existing(config.inputs.road_rule)
 
     road_files.extend(m.road for m in mesh_sets if m.road is not None)
     walk_files.extend(m.walk for m in mesh_sets if m.walk is not None)
     road_node_files.extend(m.road_node for m in mesh_sets if m.road_node is not None)
+    road_rule_files.extend(m.road_rule for m in mesh_sets if m.road_rule is not None)
 
     return DiscoveredInputs(
         road_files=list(_dedupe_paths(road_files)),
         walk_files=list(_dedupe_paths(walk_files)),
         road_node_files=list(_dedupe_paths(road_node_files)),
+        road_rule_files=list(_dedupe_paths(road_rule_files)),
         mesh_sets=mesh_sets,
     )
 
