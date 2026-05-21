@@ -11,6 +11,7 @@ import yaml
 class InputPaths:
     road: Optional[Path] = None
     walk: Optional[Path] = None
+    road_node: Optional[Path] = None
     out_dir: Path = Path("out")
 
 
@@ -34,6 +35,14 @@ class GeometryOptions:
 
 
 @dataclass(frozen=True)
+class TopologyOptions:
+    enabled: bool = False
+    node_coordinate_unit: str = "seconds"  # seconds | degrees
+    node_coordinate_precision: int = 7
+    prefer_topology_nodes: bool = True
+
+
+@dataclass(frozen=True)
 class RoutingDefaults:
     road_default_speed_kph: int = 40
     foot_default_speed_kph: int = 5
@@ -48,6 +57,7 @@ class AppConfig:
     inputs: InputPaths = field(default_factory=InputPaths)
     output: OutputOptions = field(default_factory=OutputOptions)
     geometry: GeometryOptions = field(default_factory=GeometryOptions)
+    topology: TopologyOptions = field(default_factory=TopologyOptions)
     defaults: RoutingDefaults = field(default_factory=RoutingDefaults)
     field_aliases: Dict[str, Dict[str, Iterable[str]]] = field(default_factory=dict)
     mappings: Dict[str, Any] = field(default_factory=dict)
@@ -65,16 +75,19 @@ def load_config(path: str | Path) -> AppConfig:
     input_raw = raw.get("inputs", {})
     output_raw = raw.get("output", {})
     geometry_raw = raw.get("geometry", {})
+    topology_raw = raw.get("topology", {})
     defaults_raw = raw.get("defaults", {})
 
     return AppConfig(
         inputs=InputPaths(
             road=_path_or_none(input_raw.get("road")),
             walk=_path_or_none(input_raw.get("walk")),
+            road_node=_path_or_none(input_raw.get("road_node")),
             out_dir=Path(str(input_raw.get("out_dir", "out"))),
         ),
         output=OutputOptions(**{**OutputOptions().__dict__, **output_raw}),
         geometry=GeometryOptions(**{**GeometryOptions().__dict__, **geometry_raw}),
+        topology=TopologyOptions(**{**TopologyOptions().__dict__, **topology_raw}),
         defaults=RoutingDefaults(**{**RoutingDefaults().__dict__, **defaults_raw}),
         field_aliases=raw.get("field_aliases", {}),
         mappings=raw.get("mappings", {}),
