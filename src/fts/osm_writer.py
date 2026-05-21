@@ -33,6 +33,7 @@ class OsmIdAllocator:
 
     def __init__(self) -> None:
         self._coord_to_node: Dict[Coord, int] = {}
+        self._logical_to_node: Dict[str, int] = {}
         self._next_node = -1
         self._next_way = -1_000_000_000
 
@@ -42,6 +43,18 @@ class OsmIdAllocator:
             self._coord_to_node[key] = self._next_node
             self._next_node -= 1
         return self._coord_to_node[key]
+
+    def logical_node_id(self, logical_key: str, lon: float, lat: float, precision: int) -> int:
+        """Return a stable node id for a topology node such as mesh+FNODE/TNODE.
+
+        This is used for cross-mesh topology. If two boundary nodes are resolved to
+        the same canonical logical key, they will share the same OSM node id even if
+        their source links belong to different mesh blocks.
+        """
+        if logical_key not in self._logical_to_node:
+            node_id = self.node_id(lon, lat, precision)
+            self._logical_to_node[logical_key] = node_id
+        return self._logical_to_node[logical_key]
 
     def way_id(self, source_key: str) -> int:
         digest = hashlib.sha1(source_key.encode("utf-8")).hexdigest()[:12]
@@ -67,6 +80,8 @@ def add_way_from_geometry(
     source_key: str,
     precision: int,
     mesh: Optional[str],
+    endpoint_logical_keys: Optional[Tuple[Optional[str], Optional[str]]] = None,
+    endpoint_coords: Optional[Tuple[Optional[Coord], Optional[Coord]]] = None,
 ) -> None:
     part_index = 0
     for line in iter_lines(geom):
@@ -75,10 +90,25 @@ def add_way_from_geometry(
             result.skipped.append({"source_key": source_key, "reason": "line has fewer than 2 points"})
             continue
         node_ids = []
-        for coord in coords:
+        last_idx = len(coords) - 1
+        for idx, coord in enumerate(coords):
             lon, lat = coord[0], coord[1]
-            nid = allocator.node_id(lon, lat, precision)
-            result.nodes[nid] = (round(float(lon), precision), round(float(lat), precision))
+            logical_key = None
+            logical_coord = None
+            if endpoint_logical_keys and idx == 0:
+                logical_key = endpoint_logical_keys[0]
+                logical_coord = endpoint_coords[0] if endpoint_coords else None
+            elif endpoint_logical_keys and idx == last_idx:
+                logical_key = endpoint_logical_keys[1]
+                logical_coord = endpoint_coords[1] if endpoint_coords else None
+
+            if logical_key:
+                use_lon, use_lat = logical_coord if logical_coord else (lon, lat)
+                nid = allocator.logical_node_id(logical_key, use_lon, use_lat, precision)
+                result.nodes[nid] = (round(float(use_lon), precision), round(float(use_lat), precision))
+            else:
+                nid = allocator.node_id(lon, lat, precision)
+                result.nodes[nid] = (round(float(lon), precision), round(float(lat), precision))
             node_ids.append(nid)
         way_tags = {k: v for k, v in tags.items() if v is not None and str(v) != ""}
         way_tags["source:part"] = str(part_index)
