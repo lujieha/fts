@@ -59,6 +59,16 @@ def _row_mesh(row: Any, aliases: Dict[str, Any], split_key: str = "MESH") -> Opt
     return None
 
 
+def _global_feature_key(prefix: str, mesh: Optional[str], local_id: str) -> str:
+    """Return globally unique source key.
+
+    Source ids are only unique inside one mesh in this dataset. Always include mesh
+    in generated source keys to avoid OSM way id collisions across mesh folders.
+    """
+    mesh_key = mesh or "unknown_mesh"
+    return f"{prefix}:{mesh_key}:{local_id}"
+
+
 def _road_endpoint_topology(
     row: Any,
     aliases: Dict[str, Any],
@@ -147,7 +157,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
             if config.defaults.drop_forbidden and tags.get("access") == "no":
                 continue
             mesh = _row_mesh(row, road_aliases, config.output.split_key)
-            key = "road:" + _row_id(row, ["ROAD_ID", "ROAD"], road_aliases, str(index))
+            local_id = _row_id(row, ["ROAD_ID", "ROAD"], road_aliases, str(index))
+            key = _global_feature_key("road", mesh, local_id)
             endpoint_keys, endpoint_coords = (None, None), (None, None)
             if config.topology.prefer_topology_nodes:
                 endpoint_keys, endpoint_coords = _road_endpoint_topology(row, road_aliases, mesh, topology)
@@ -161,7 +172,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
             if config.defaults.drop_forbidden and tags.get("access") == "no":
                 continue
             mesh = _row_mesh(row, walk_aliases, config.output.split_key)
-            key = "walk:" + _row_id(row, ["LINK_ID"], walk_aliases, str(index))
+            local_id = _row_id(row, ["LINK_ID"], walk_aliases, str(index))
+            key = _global_feature_key("walk", mesh, local_id)
             add_to_results(row, row.geometry, tags, key, mesh)
 
     outputs: Dict[str, Path] = {}
