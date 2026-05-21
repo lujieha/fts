@@ -3,6 +3,7 @@ inputs:
   road: ""
   walk: ""
   road_node: ""
+  road_rule: ""
 
   # 区目录模式：一个区由多个以 mesh 命名的子文件夹组成。
   # 示例：data/region/5339456210/RoadSegment.shp
@@ -11,6 +12,7 @@ inputs:
   road_filename: "RoadSegment.shp"
   walk_filename: "WALK_LINK.shp"
   road_node_filename: "RoadNodeRoadCross.shp"
+  road_rule_filename: "RoadRule.shp"
 
   out_dir: "out"
 
@@ -48,6 +50,11 @@ defaults:
   assume_access_yes_when_unknown: true
   drop_forbidden: true
   include_private_roads: false
+  # MAX_SPEED 优先；无 MAX_SPEED 时是否用 AVE_SPEED 或 SPEED_CATE 兜底生成 maxspeed。
+  use_average_speed_as_maxspeed_fallback: false
+  use_speed_cate_as_maxspeed_fallback: true
+  # 是否应用 RoadSegment.RULE -> RoadRule.RULE 的路段级限制。
+  apply_road_rules: true
 
 field_aliases:
   road:
@@ -61,6 +68,11 @@ field_aliases:
     ROAD_CLASS: ["ROAD_CLASS", "ROADCLASS"]
     DIRECTION: ["DIRECTION", "DIR"]
     MAX_SPEED: ["MAX_SPEED", "MAXSPEED"]
+    AVE_SPEED: ["AVE_SPEED", "AVESPEED"]
+    SPEED_CATE: ["SPEED_CATE", "SPEEDCATE"]
+    EXPECTIME: ["EXPECTIME", "EXPEC_TIME"]
+    RULE: ["RULE"]
+    RULE_CNT: ["RULE_CNT", "RULECNT"]
     S_LANES: ["S_LANES", "LANES"]
     WIDTH: ["WIDTH"]
     TOLL_FLAG: ["TOLL_FLAG", "TOLLFLAG"]
@@ -71,6 +83,15 @@ field_aliases:
     OVER_HEAD: ["OVER_HEAD", "OVERHEAD"]
     PAVER: ["PAVER"]
     OWNERSHIP: ["OWNERSHIP"]
+  road_rule:
+    RULE: ["RULE"]
+    RULE_ID: ["RULE_ID", "RULEID"]
+    RULE_FLAG: ["RULE_FLAG", "RULEFLAG"]
+    RULE_TYPE: ["RULE_TYPE", "RULETYPE"]
+    RULE_TIME: ["RULE_TIME", "RULETIME"]
+    VEHICLE: ["VEHICLE"]
+    DIR: ["DIR"]
+    CODE: ["CODE"]
   road_node:
     MESH: ["MESH"]
     NODE: ["NODE"]
