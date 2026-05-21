@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 import geopandas as gpd
+import pandas as pd
 
 from .config import resolve_field
 
@@ -135,30 +136,31 @@ def _canonical_pair(a: TopologyNodeKey, b: TopologyNodeKey) -> TopologyNodeKey:
 
 
 def build_topology_index(
-    node_path: Path,
+    node_path: Path | Sequence[Path],
     aliases: Dict[str, Iterable[str]],
     *,
     coordinate_unit: str = "seconds",
     coordinate_precision: int = 7,
 ) -> TopologyIndex:
-    """Build a cross-mesh node index from RoadNodeRoadCross.
+    """Build a cross-mesh node index from one or many RoadNodeRoadCross shapefiles.
 
     Matching rule:
-    1. Read each boundary node from RoadNodeRoadCross.
+    1. Read each boundary node from all RoadNodeRoadCross files in the region.
     2. Use `get_neighbor_mesh(mesh, boundary)` to find the neighbor mesh.
     3. Look for a node in the neighbor mesh whose BOUNDARY is the opposite side and
        whose X_COORD/Y_COORD match after rounding.
     4. Alias both logical nodes to one canonical topology node.
-
-    This supports the case described in the data spec:
-    - current mesh `BOUNDARY == 2` is on the upper boundary;
-    - upper neighbor mesh should have the corresponding node with `BOUNDARY == 8`;
-    - matching coordinates indicate the same cross-mesh node.
     """
-    if not node_path.exists():
-        raise FileNotFoundError(f"RoadNodeRoadCross shapefile not found: {node_path}")
+    paths = [node_path] if isinstance(node_path, Path) else list(node_path)
+    existing_paths = [p for p in paths if p.exists()]
+    if not existing_paths:
+        raise FileNotFoundError(f"No RoadNodeRoadCross shapefiles found: {paths}")
 
-    gdf = gpd.read_file(node_path)
+    frames = [gpd.read_file(path) for path in existing_paths]
+    if not frames:
+        return TopologyIndex(aliases={}, node_coords={})
+    gdf = gpd.GeoDataFrame(pd.concat(frames, ignore_index=True), crs=frames[0].crs)
+
     boundary_nodes: list[BoundaryNode] = []
     by_mesh_boundary_coord: Dict[Tuple[str, int, CoordKey], BoundaryNode] = {}
     node_coords: Dict[TopologyNodeKey, CoordKey] = {}
