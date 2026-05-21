@@ -9,9 +9,17 @@ import pandas as pd
 from .config import AppConfig, resolve_field
 from .inputs import discover_inputs
 from .mapping import map_road_tags, map_walk_tags
-from .osm_writer import OsmBuildResult, OsmIdAllocator, add_way_from_geometry, write_osm_xml, write_statistics
+from .osm_writer import (
+    OsmBuildResult,
+    OsmIdAllocator,
+    add_relation,
+    add_way_from_geometry,
+    write_osm_xml,
+    write_statistics,
+)
 from .rules import RoadRuleIndex, apply_road_rules, build_road_rule_index
 from .topology import TopologyIndex, build_topology_index
+from .turns import build_turn_restrictions, build_turn_rule_index, read_maat_files
 
 
 def _read_shapefile(path: Path, target_crs: str) -> gpd.GeoDataFrame:
@@ -91,6 +99,28 @@ def _road_endpoint_topology(
     return (fkey_text, tkey_text), (fcoord, tcoord)
 
 
+def _ensure_topology_node_id(
+    allocator: OsmIdAllocator,
+    result: OsmBuildResult,
+    topology: Optional[TopologyIndex],
+    mesh: str,
+    node: str,
+    precision: int,
+) -> Optional[int]:
+    if topology is None:
+        return None
+    canonical = topology.canonical_node(mesh, node)
+    if canonical is None:
+        return None
+    coord = topology.node_coords.get(canonical)
+    if coord is None:
+        return None
+    logical_key = f"roadnode:{canonical[0]}:{canonical[1]}"
+    node_id = allocator.logical_node_id(logical_key, coord[0], coord[1], precision)
+    result.nodes[node_id] = (round(float(coord[0]), precision), round(float(coord[1]), precision))
+    return node_id
+
+
 def convert(config: AppConfig) -> Dict[str, Path]:
     out_dir = config.inputs.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -101,6 +131,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
     per_mesh: Dict[str, OsmBuildResult] = {}
     topology: Optional[TopologyIndex] = None
     road_rules = RoadRuleIndex({})
+    road_way_index: Dict[Tuple[str, str], int] = {}
+    logical_node_to_osm_id: Dict[str, int] = {}
 
     if config.topology.enabled:
         if not discovered.road_node_files:
@@ -128,8 +160,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
         mesh: Optional[str],
         endpoint_logical_keys: Optional[Tuple[Optional[str], Optional[str]]] = None,
         endpoint_coords: Optional[Tuple[Optional[Tuple[float, float]], Optional[Tuple[float, float]]]] = None,
-    ) -> None:
-        add_way_from_geometry(
+    ) -> list[int]:
+        merged_way_ids = add_way_from_geometry(
             merged,
             allocator,
             geom,
@@ -156,6 +188,7 @@ def convert(config: AppConfig) -> Dict[str, Path]:
                 endpoint_logical_keys=endpoint_logical_keys,
                 endpoint_coords=endpoint_coords,
             )
+        return merged_way_ids
 
     if discovered.road_files:
         road_gdf = _read_many_shapefiles(discovered.road_files, config.geometry.target_crs)
@@ -167,12 +200,81 @@ def convert(config: AppConfig) -> Dict[str, Path]:
             if config.defaults.drop_forbidden and tags.get("access") == "no":
                 continue
             mesh = _row_mesh(row, road_aliases, config.output.split_key)
-            local_id = _row_id(row, ["ROAD_ID", "ROAD"], road_aliases, str(index))
+            local_id = _row_id(row, ["ROAD", "ROAD_ID"], road_aliases, str(index))
             key = _global_feature_key("road", mesh, local_id)
             endpoint_keys, endpoint_coords = (None, None), (None, None)
             if config.topology.prefer_topology_nodes:
                 endpoint_keys, endpoint_coords = _road_endpoint_topology(row, road_aliases, mesh, topology)
-            add_to_results(row, row.geometry, tags, key, mesh, endpoint_keys, endpoint_coords)
+            way_ids = add_to_results(row, row.geometry, tags, key, mesh, endpoint_keys, endpoint_coords)
+            if mesh and way_ids:
+                road_way_index[(mesh, local_id)] = way_ids[0]
+            if endpoint_keys and endpoint_coords:
+                for logical_key, coord in zip(endpoint_keys, endpoint_coords):
+                    if logical_key and coord:
+                        nid = allocator.logical_node_id(logical_key, coord[0], coord[1], config.output.precision)
+                        logical_node_to_osm_id[logical_key] = nid
+
+    if config.defaults.apply_turn_restrictions:
+        turn_rule_paths = discovered.road_node_rule_files + discovered.road_cross_rule_files
+        maat_items = []
+        if discovered.road_node_maat_files:
+            maat_items.extend(
+                read_maat_files(
+                    discovered.road_node_maat_files,
+                    config.field_aliases.get("road_node_maat", {}),
+                    source="node",
+                )
+            )
+        if discovered.road_cross_maat_files:
+            maat_items.extend(
+                read_maat_files(
+                    discovered.road_cross_maat_files,
+                    config.field_aliases.get("road_cross_maat", {}),
+                    source="cross",
+                )
+            )
+        if turn_rule_paths and maat_items:
+            turn_rules = build_turn_rule_index(
+                turn_rule_paths,
+                config.field_aliases.get("turn_rule", {}),
+            )
+            # Ensure via node ids exist for Maat nodes even when no road endpoint used them yet.
+            if topology is not None:
+                for maat in maat_items:
+                    canonical = topology.canonical_node(maat.mesh, maat.node)
+                    if canonical:
+                        logical_key = f"roadnode:{canonical[0]}:{canonical[1]}"
+                        if logical_key not in logical_node_to_osm_id:
+                            node_id = _ensure_topology_node_id(
+                                allocator,
+                                merged,
+                                topology,
+                                maat.mesh,
+                                maat.node,
+                                config.output.precision,
+                            )
+                            if node_id is not None:
+                                logical_node_to_osm_id[logical_key] = node_id
+            restrictions, skipped = build_turn_restrictions(
+                maat_items,
+                turn_rules,
+                road_way_index,
+                topology,
+                logical_node_to_osm_id,
+            )
+            merged.skipped.extend(skipped)
+            for restriction in restrictions:
+                add_relation(merged, allocator, restriction.source_key, restriction.members, restriction.tags)
+                if config.output.mode in {"by_mesh", "both"}:
+                    mesh_key = restriction.tags.get("source:mesh", "unknown")
+                    if mesh_key in per_mesh:
+                        add_relation(
+                            per_mesh[mesh_key],
+                            allocator,
+                            restriction.source_key,
+                            restriction.members,
+                            restriction.tags,
+                        )
 
     if discovered.walk_files:
         walk_gdf = _read_many_shapefiles(discovered.walk_files, config.geometry.target_crs)
