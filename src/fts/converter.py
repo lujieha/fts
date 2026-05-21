@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 import geopandas as gpd
 
 from .config import AppConfig, resolve_field
 from .mapping import map_road_tags, map_walk_tags
 from .osm_writer import OsmBuildResult, OsmIdAllocator, add_way_from_geometry, write_osm_xml, write_statistics
+from .topology import TopologyIndex, build_topology_index
 
 
 def _read_shapefile(path: Path, target_crs: str) -> gpd.GeoDataFrame:
@@ -39,6 +40,27 @@ def _row_mesh(row: Any, aliases: Dict[str, Any], split_key: str = "MESH") -> Opt
     return str(value).strip()
 
 
+def _road_endpoint_topology(
+    row: Any,
+    aliases: Dict[str, Any],
+    mesh: Optional[str],
+    topology: Optional[TopologyIndex],
+) -> Tuple[Tuple[Optional[str], Optional[str]], Tuple[Optional[Tuple[float, float]], Optional[Tuple[float, float]]]]:
+    if topology is None or mesh is None:
+        return (None, None), (None, None)
+
+    fnode = resolve_field(row, "FNODE", aliases)
+    tnode = resolve_field(row, "TNODE", aliases)
+    fkey = topology.canonical_node(mesh, fnode)
+    tkey = topology.canonical_node(mesh, tnode)
+
+    fkey_text = f"roadnode:{fkey[0]}:{fkey[1]}" if fkey else None
+    tkey_text = f"roadnode:{tkey[0]}:{tkey[1]}" if tkey else None
+    fcoord = topology.canonical_coord(mesh, fnode)
+    tcoord = topology.canonical_coord(mesh, tnode)
+    return (fkey_text, tkey_text), (fcoord, tcoord)
+
+
 def convert(config: AppConfig) -> Dict[str, Path]:
     out_dir = config.inputs.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -46,8 +68,27 @@ def convert(config: AppConfig) -> Dict[str, Path]:
     allocator = OsmIdAllocator()
     merged = OsmBuildResult()
     per_mesh: Dict[str, OsmBuildResult] = {}
+    topology: Optional[TopologyIndex] = None
 
-    def add_to_results(row: Any, geom: Any, tags: Dict[str, str], source_key: str, mesh: Optional[str]) -> None:
+    if config.topology.enabled:
+        if not config.inputs.road_node:
+            raise ValueError("topology.enabled=true requires inputs.road_node to point to RoadNodeRoadCross.shp")
+        topology = build_topology_index(
+            config.inputs.road_node,
+            config.field_aliases.get("road_node", {}),
+            coordinate_unit=config.topology.node_coordinate_unit,
+            coordinate_precision=config.topology.node_coordinate_precision,
+        )
+
+    def add_to_results(
+        row: Any,
+        geom: Any,
+        tags: Dict[str, str],
+        source_key: str,
+        mesh: Optional[str],
+        endpoint_logical_keys: Optional[Tuple[Optional[str], Optional[str]]] = None,
+        endpoint_coords: Optional[Tuple[Optional[Tuple[float, float]], Optional[Tuple[float, float]]]] = None,
+    ) -> None:
         add_way_from_geometry(
             merged,
             allocator,
@@ -56,6 +97,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
             source_key,
             config.output.precision,
             mesh,
+            endpoint_logical_keys=endpoint_logical_keys,
+            endpoint_coords=endpoint_coords,
         )
         if config.output.mode in {"by_mesh", "both"}:
             mesh_key = mesh or "unknown"
@@ -70,6 +113,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
                 source_key,
                 config.output.precision,
                 mesh,
+                endpoint_logical_keys=endpoint_logical_keys,
+                endpoint_coords=endpoint_coords,
             )
 
     if config.inputs.road:
@@ -81,7 +126,10 @@ def convert(config: AppConfig) -> Dict[str, Path]:
                 continue
             mesh = _row_mesh(row, road_aliases, config.output.split_key)
             key = "road:" + _row_id(row, ["ROAD_ID", "ROAD"], road_aliases, str(index))
-            add_to_results(row, row.geometry, tags, key, mesh)
+            endpoint_keys, endpoint_coords = (None, None), (None, None)
+            if config.topology.prefer_topology_nodes:
+                endpoint_keys, endpoint_coords = _road_endpoint_topology(row, road_aliases, mesh, topology)
+            add_to_results(row, row.geometry, tags, key, mesh, endpoint_keys, endpoint_coords)
 
     if config.inputs.walk:
         walk_gdf = _read_shapefile(config.inputs.walk, config.geometry.target_crs)
