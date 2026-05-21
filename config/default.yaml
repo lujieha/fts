@@ -1,0 +1,69 @@
+inputs:
+  road: "data/RoadSegment.shp"
+  walk: "data/WALK_LINK.shp"
+  out_dir: "out"
+
+output:
+  # merged: 输出一个 Valhalla 输入 OSM 文件
+  # by_mesh: 按 MESH 输出多个 OSM 文件
+  # both: 同时输出合并文件和 mesh 分块文件
+  mode: "both"
+  file_name: "valhalla_input.osm"
+  split_key: "MESH"
+  osm_version: "0.6"
+  generator: "fts-shp2osm"
+  precision: 7
+  write_statistics: true
+
+geometry:
+  target_crs: "EPSG:4326"
+  snap_tolerance_m: 0.15
+  preserve_shape_vertices: true
+  simplify_tolerance_m: 0.0
+
+defaults:
+  road_default_speed_kph: 40
+  foot_default_speed_kph: 5
+  bicycle_default_speed_kph: 15
+  assume_access_yes_when_unknown: true
+  drop_forbidden: true
+  include_private_roads: false
+
+field_aliases:
+  road:
+    MESH: ["MESH"]
+    ROAD: ["ROAD"]
+    ROAD_ID: ["ROAD_ID"]
+    NAME_CHN: ["NAME_CHN", "NAME", "NAMECHN"]
+    NAME_ENG: ["NAME_ENG"]
+    ROAD_CLASS: ["ROAD_CLASS", "ROADCLASS"]
+    DIRECTION: ["DIRECTION", "DIR"]
+    MAX_SPEED: ["MAX_SPEED", "MAXSPEED"]
+    S_LANES: ["S_LANES", "LANES"]
+    WIDTH: ["WIDTH"]
+    TOLL_FLAG: ["TOLL_FLAG", "TOLLFLAG"]
+    VEHICLE: ["VEHICLE"]
+    STATUS: ["STATUS"]
+    FORM_WAY: ["FORM_WAY", "FORMWAY"]
+    LINK_TYPE: ["LINK_TYPE", "LINKTYPE"]
+    OVER_HEAD: ["OVER_HEAD", "OVERHEAD"]
+    PAVER: ["PAVER"]
+    OWNERSHIP: ["OWNERSHIP"]
+  walk:
+    MESH: ["MESH"]
+    LINK_ID: ["LINK_ID", "LINKID"]
+    NAME: ["NAME"]
+    WF_TYPE: ["WF_TYPE", "WFTYPE"]
+    LINK_TYPE: ["LINK_TYPE", "LINK TYPE", "LINKTYPE"]
+    ISTOLL: ["ISTOLL"]
+    CONSTATUS: ["CONSTATUS"]
+    DIRECTION: ["DIRECTION", "DIR"]
+    SLOPE: ["SLOPE"]
+    BLOCK_TYPE: ["BLOCK_TYPE", "BLOCK TYPE"]
+    NAVITYPE: ["NAVITYPE"]
+    BICYCLE: ["BICYCLE"]
+    BI_DIR: ["BI_DIR", "BI DIR"]
+    GREENWAY: ["GREENWAY"]
+    BW_MARK: ["BW_MARK"]
+    BOUND_RB: ["BOUND_RB"]
+    BOUND_BW: ["BOUND_BW", "BOUND BW"]
