@@ -19,6 +19,17 @@ ROAD_CLASS_TO_HIGHWAY = {
     49000: "service",
 }
 
+SPEED_CATE_TO_KPH = {
+    1: 130,
+    2: 115,
+    3: 95,
+    4: 80,
+    5: 60,
+    6: 40,
+    7: 20,
+    8: 10,
+}
+
 FORM_WAY_RAMP = {6, 8, 9, 10, 56, 58}
 LINK_TYPE_SPECIAL = {
     1: {"route": "ferry"},
@@ -72,6 +83,33 @@ def _yes_no_from_1_2(value: Any, yes_code: int = 1, no_code: int = 2) -> Optiona
     return None
 
 
+def _speed_from_fields(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str, str]:
+    tags: Dict[str, str] = {}
+    max_speed = _int(resolve_field(row, "MAX_SPEED", aliases), 0)
+    ave_speed = _int(resolve_field(row, "AVE_SPEED", aliases), 0)
+    speed_cate = _int(resolve_field(row, "SPEED_CATE", aliases), 0)
+
+    if max_speed > 0:
+        tags["maxspeed"] = str(max_speed)
+        tags["source:maxspeed"] = "MAX_SPEED"
+    elif ave_speed > 0 and getattr(defaults, "use_average_speed_as_maxspeed_fallback", False):
+        tags["maxspeed"] = str(ave_speed)
+        tags["source:maxspeed"] = "AVE_SPEED"
+    elif speed_cate in SPEED_CATE_TO_KPH and getattr(defaults, "use_speed_cate_as_maxspeed_fallback", True):
+        tags["maxspeed"] = str(SPEED_CATE_TO_KPH[speed_cate])
+        tags["source:maxspeed"] = "SPEED_CATE"
+    elif defaults.road_default_speed_kph > 0:
+        tags["maxspeed"] = str(defaults.road_default_speed_kph)
+        tags["source:maxspeed"] = "default"
+
+    if ave_speed > 0:
+        tags["source:ave_speed"] = str(ave_speed)
+        tags["source:ave_speed:unit"] = "km/h"
+    if speed_cate > 0:
+        tags["source:speed_cate"] = str(speed_cate)
+    return tags
+
+
 def map_road_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str, str]:
     road_class = _int(resolve_field(row, "ROAD_CLASS", aliases), 47000)
     form_way = _int(resolve_field(row, "FORM_WAY", aliases), 15)
@@ -106,11 +144,19 @@ def map_road_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     if name_en:
         tags["name:en"] = name_en
 
-    max_speed = _int(resolve_field(row, "MAX_SPEED", aliases), 0)
-    if max_speed > 0:
-        tags["maxspeed"] = str(max_speed)
-    elif defaults.road_default_speed_kph > 0:
-        tags["maxspeed"] = str(defaults.road_default_speed_kph)
+    tags.update(_speed_from_fields(row, aliases, defaults))
+
+    expectime = _clean(resolve_field(row, "EXPECTIME", aliases))
+    if expectime:
+        tags["opening_date:conditional"] = expectime
+        tags["source:expectime"] = expectime
+
+    rule = _int(resolve_field(row, "RULE", aliases), 0)
+    rule_cnt = _int(resolve_field(row, "RULE_CNT", aliases), 0)
+    if rule > 0:
+        tags["source:rule"] = str(rule)
+    if rule_cnt > 0:
+        tags["source:rule_cnt"] = str(rule_cnt)
 
     lanes = _int(resolve_field(row, "S_LANES", aliases), 0)
     if lanes > 0:
