@@ -8,6 +8,7 @@ inputs:
   road_cross_maat: ""
   road_node_rule: ""
   road_cross_rule: ""
+  walk_enter: ""
 
   # 区目录模式：一个区由多个以 mesh 命名的子文件夹组成。
   region_dir: "data/region"
@@ -20,6 +21,7 @@ inputs:
   road_cross_maat_filename: "RoadCrossMaat.shp"
   road_node_rule_filename: "RoadNodeRule.shp"
   road_cross_rule_filename: "RoadCrossRule.shp"
+  walk_enter_filename: "WALK_ENTER.shp"
 
   out_dir: "out"
 
@@ -43,6 +45,7 @@ topology:
   node_coordinate_unit: "seconds"
   node_coordinate_precision: 7
   prefer_topology_nodes: true
+  prefer_walk_enter_nodes: true
 
 defaults:
   road_default_speed_kph: 40
@@ -55,6 +58,8 @@ defaults:
   use_speed_cate_as_maxspeed_fallback: true
   apply_road_rules: true
   apply_turn_restrictions: true
+  apply_time_conditionals: true
+  apply_vehicle_restrictions: true
 
 field_aliases:
   road:
@@ -124,6 +129,8 @@ field_aliases:
   walk:
     MESH: ["MESH"]
     LINK_ID: ["LINK_ID", "LINKID"]
+    F_ENTER: ["F_ENTER", "FENTER"]
+    T_ENTER: ["T_ENTER", "TENTER"]
     NAME: ["NAME"]
     WF_TYPE: ["WF_TYPE", "WFTYPE"]
     LINK_TYPE: ["LINK_TYPE", "LINK TYPE", "LINKTYPE"]
@@ -131,6 +138,8 @@ field_aliases:
     CONSTATUS: ["CONSTATUS"]
     DIRECTION: ["DIRECTION", "DIR"]
     SLOPE: ["SLOPE"]
+    WIDTH: ["WIDTH"]
+    SURFACE: ["SURFACE"]
     BLOCK_TYPE: ["BLOCK_TYPE", "BLOCK TYPE"]
     NAVITYPE: ["NAVITYPE"]
     BICYCLE: ["BICYCLE"]
@@ -139,3 +148,8 @@ field_aliases:
     BW_MARK: ["BW_MARK"]
     BOUND_RB: ["BOUND_RB"]
     BOUND_BW: ["BOUND_BW", "BOUND BW"]
+  walk_enter:
+    MESH: ["MESH"]
+    ENTER_ID: ["ENTER_ID", "ENTERID", "NODE", "NODE_ID", "NODEID"]
+    X_COORD: ["X_COORD", "XCOORD"]
+    Y_COORD: ["Y_COORD", "YCOORD"]
