@@ -4,22 +4,26 @@ inputs:
   walk: ""
   road_node: ""
   road_rule: ""
+  road_node_maat: ""
+  road_cross_maat: ""
+  road_node_rule: ""
+  road_cross_rule: ""
 
   # 区目录模式：一个区由多个以 mesh 命名的子文件夹组成。
-  # 示例：data/region/5339456210/RoadSegment.shp
   region_dir: "data/region"
   mesh_dir_glob: "*"
   road_filename: "RoadSegment.shp"
   walk_filename: "WALK_LINK.shp"
   road_node_filename: "RoadNodeRoadCross.shp"
   road_rule_filename: "RoadRule.shp"
+  road_node_maat_filename: "RoadNodeMaat.shp"
+  road_cross_maat_filename: "RoadCrossMaat.shp"
+  road_node_rule_filename: "RoadNodeRule.shp"
+  road_cross_rule_filename: "RoadCrossRule.shp"
 
   out_dir: "out"
 
 output:
-  # merged: 输出一个 Valhalla 输入 OSM 文件
-  # by_mesh: 按 MESH 输出多个 OSM 文件
-  # both: 同时输出合并文件和 mesh 分块文件
   mode: "both"
   file_name: "valhalla_input.osm"
   split_key: "MESH"
@@ -35,10 +39,7 @@ geometry:
   simplify_tolerance_m: 0.0
 
 topology:
-  # 开启后，RoadSegment 的 FNODE/TNODE 会优先映射到 RoadNodeRoadCross 中的逻辑节点。
-  # 跨 mesh 边界节点通过 BOUNDARY 方向、邻接 mesh 和坐标匹配归并为同一个 OSM node。
   enabled: false
-  # 规范中 X_COORD/Y_COORD 是秒；如果你的 Shapefile 已是十进制度，改为 degrees。
   node_coordinate_unit: "seconds"
   node_coordinate_precision: 7
   prefer_topology_nodes: true
@@ -50,11 +51,10 @@ defaults:
   assume_access_yes_when_unknown: true
   drop_forbidden: true
   include_private_roads: false
-  # MAX_SPEED 优先；无 MAX_SPEED 时是否用 AVE_SPEED 或 SPEED_CATE 兜底生成 maxspeed。
   use_average_speed_as_maxspeed_fallback: false
   use_speed_cate_as_maxspeed_fallback: true
-  # 是否应用 RoadSegment.RULE -> RoadRule.RULE 的路段级限制。
   apply_road_rules: true
+  apply_turn_restrictions: true
 
 field_aliases:
   road:
@@ -99,6 +99,28 @@ field_aliases:
     X_COORD: ["X_COORD", "XCOORD"]
     Y_COORD: ["Y_COORD", "YCOORD"]
     BOUNDARY: ["BOUNDARY"]
+  road_node_maat:
+    MESH: ["MESH"]
+    NODE: ["NODE", "NODE_ID", "NODEID"]
+    FROM_ROAD: ["FROM_ROAD", "FROMROAD"]
+    TO_ROAD: ["TO_ROAD", "TOROAD"]
+    RULE: ["RULE"]
+    RULE_CNT: ["RULE_CNT", "RULECNT"]
+  road_cross_maat:
+    MESH: ["MESH"]
+    NODE: ["NODE", "NODE_ID", "NODEID"]
+    FROM_ROAD: ["FROM_ROAD", "FROMROAD"]
+    TO_ROAD: ["TO_ROAD", "TOROAD"]
+    RULE: ["RULE"]
+    RULE_CNT: ["RULE_CNT", "RULECNT"]
+  turn_rule:
+    RULE: ["RULE"]
+    RULE_ID: ["RULE_ID", "RULEID"]
+    RULE_FLAG: ["RULE_FLAG", "RULEFLAG"]
+    RULE_TYPE: ["RULE_TYPE", "RULETYPE"]
+    RULE_SIGN: ["RULE_SIGN", "RULESIGN"]
+    RULE_TIME: ["RULE_TIME", "RULETIME"]
+    VEHICLE: ["VEHICLE"]
   walk:
     MESH: ["MESH"]
     LINK_ID: ["LINK_ID", "LINKID"]
