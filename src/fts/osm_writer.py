@@ -22,9 +22,24 @@ class OsmWay:
 
 
 @dataclass
+class OsmRelationMember:
+    type: str
+    ref: int
+    role: str
+
+
+@dataclass
+class OsmRelation:
+    relation_id: int
+    members: List[OsmRelationMember]
+    tags: Dict[str, str]
+
+
+@dataclass
 class OsmBuildResult:
     nodes: Dict[int, Coord] = field(default_factory=dict)
     ways: List[OsmWay] = field(default_factory=list)
+    relations: List[OsmRelation] = field(default_factory=list)
     skipped: List[Dict[str, str]] = field(default_factory=list)
 
 
@@ -45,12 +60,7 @@ class OsmIdAllocator:
         return self._coord_to_node[key]
 
     def logical_node_id(self, logical_key: str, lon: float, lat: float, precision: int) -> int:
-        """Return a stable node id for a topology node such as mesh+FNODE/TNODE.
-
-        This is used for cross-mesh topology. If two boundary nodes are resolved to
-        the same canonical logical key, they will share the same OSM node id even if
-        their source links belong to different mesh blocks.
-        """
+        """Return a stable node id for a topology node such as mesh+FNODE/TNODE."""
         if logical_key not in self._logical_to_node:
             node_id = self.node_id(lon, lat, precision)
             self._logical_to_node[logical_key] = node_id
@@ -59,6 +69,10 @@ class OsmIdAllocator:
     def way_id(self, source_key: str) -> int:
         digest = hashlib.sha1(source_key.encode("utf-8")).hexdigest()[:12]
         return -1_000_000 - int(digest, 16) % 900_000_000
+
+    def relation_id(self, source_key: str) -> int:
+        digest = hashlib.sha1(source_key.encode("utf-8")).hexdigest()[:12]
+        return -2_000_000_000 - int(digest, 16) % 900_000_000
 
 
 def iter_lines(geom) -> Iterable[LineString]:
@@ -82,7 +96,8 @@ def add_way_from_geometry(
     mesh: Optional[str],
     endpoint_logical_keys: Optional[Tuple[Optional[str], Optional[str]]] = None,
     endpoint_coords: Optional[Tuple[Optional[Coord], Optional[Coord]]] = None,
-) -> None:
+) -> List[int]:
+    created_way_ids: List[int] = []
     part_index = 0
     for line in iter_lines(geom):
         coords = list(line.coords)
@@ -112,15 +127,36 @@ def add_way_from_geometry(
             node_ids.append(nid)
         way_tags = {k: v for k, v in tags.items() if v is not None and str(v) != ""}
         way_tags["source:part"] = str(part_index)
+        way_id = allocator.way_id(f"{source_key}:{part_index}")
         result.ways.append(
             OsmWay(
-                way_id=allocator.way_id(f"{source_key}:{part_index}"),
+                way_id=way_id,
                 node_ids=node_ids,
                 tags=way_tags,
                 mesh=mesh,
             )
         )
+        created_way_ids.append(way_id)
         part_index += 1
+    return created_way_ids
+
+
+def add_relation(
+    result: OsmBuildResult,
+    allocator: OsmIdAllocator,
+    source_key: str,
+    members: List[OsmRelationMember],
+    tags: Dict[str, str],
+) -> int:
+    relation_id = allocator.relation_id(source_key)
+    result.relations.append(
+        OsmRelation(
+            relation_id=relation_id,
+            members=members,
+            tags={k: v for k, v in tags.items() if v is not None and str(v) != ""},
+        )
+    )
+    return relation_id
 
 
 def write_osm_xml(
@@ -143,6 +179,13 @@ def write_osm_xml(
         for key, value in sorted(way.tags.items()):
             etree.SubElement(w, "tag", k=str(key), v=str(value))
 
+    for relation in result.relations:
+        r = etree.SubElement(root, "relation", id=str(relation.relation_id), visible="true")
+        for member in relation.members:
+            etree.SubElement(r, "member", type=member.type, ref=str(member.ref), role=member.role)
+        for key, value in sorted(relation.tags.items()):
+            etree.SubElement(r, "tag", k=str(key), v=str(value))
+
     tree = etree.ElementTree(root)
     tree.write(str(output_path), encoding="utf-8", xml_declaration=True, pretty_print=True)
 
@@ -157,6 +200,7 @@ def write_statistics(result: OsmBuildResult, output_path: Path) -> None:
     payload = {
         "nodes": len(result.nodes),
         "ways": len(result.ways),
+        "relations": len(result.relations),
         "skipped": len(result.skipped),
         "by_highway": dict(sorted(by_highway.items())),
         "by_mesh": dict(sorted(by_mesh.items())),
