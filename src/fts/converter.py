@@ -10,6 +10,7 @@ from .config import AppConfig, resolve_field
 from .inputs import discover_inputs
 from .mapping import map_road_tags, map_walk_tags
 from .osm_writer import OsmBuildResult, OsmIdAllocator, add_way_from_geometry, write_osm_xml, write_statistics
+from .rules import RoadRuleIndex, apply_road_rules, build_road_rule_index
 from .topology import TopologyIndex, build_topology_index
 
 
@@ -99,6 +100,7 @@ def convert(config: AppConfig) -> Dict[str, Path]:
     merged = OsmBuildResult()
     per_mesh: Dict[str, OsmBuildResult] = {}
     topology: Optional[TopologyIndex] = None
+    road_rules = RoadRuleIndex({})
 
     if config.topology.enabled:
         if not discovered.road_node_files:
@@ -110,6 +112,12 @@ def convert(config: AppConfig) -> Dict[str, Path]:
             config.field_aliases.get("road_node", {}),
             coordinate_unit=config.topology.node_coordinate_unit,
             coordinate_precision=config.topology.node_coordinate_precision,
+        )
+
+    if config.defaults.apply_road_rules and discovered.road_rule_files:
+        road_rules = build_road_rule_index(
+            discovered.road_rule_files,
+            config.field_aliases.get("road_rule", {}),
         )
 
     def add_to_results(
@@ -154,6 +162,8 @@ def convert(config: AppConfig) -> Dict[str, Path]:
         road_aliases = config.field_aliases.get("road", {})
         for index, row in road_gdf.iterrows():
             tags = map_road_tags(row, road_aliases, config.defaults)
+            rule_value = resolve_field(row, "RULE", road_aliases)
+            tags = apply_road_rules(tags, road_rules.get(rule_value))
             if config.defaults.drop_forbidden and tags.get("access") == "no":
                 continue
             mesh = _row_mesh(row, road_aliases, config.output.split_key)
