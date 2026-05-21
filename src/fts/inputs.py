@@ -17,6 +17,10 @@ class MeshInputSet:
     walk: Optional[Path] = None
     road_node: Optional[Path] = None
     road_rule: Optional[Path] = None
+    road_node_maat: Optional[Path] = None
+    road_cross_maat: Optional[Path] = None
+    road_node_rule: Optional[Path] = None
+    road_cross_rule: Optional[Path] = None
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,10 @@ class DiscoveredInputs:
     walk_files: List[Path]
     road_node_files: List[Path]
     road_rule_files: List[Path]
+    road_node_maat_files: List[Path]
+    road_cross_maat_files: List[Path]
+    road_node_rule_files: List[Path]
+    road_cross_rule_files: List[Path]
     mesh_sets: List[MeshInputSet]
 
 
@@ -50,7 +58,23 @@ def discover_mesh_inputs(config: AppConfig) -> List[MeshInputSet]:
         walk = mesh_dir / config.inputs.walk_filename
         road_node = mesh_dir / config.inputs.road_node_filename
         road_rule = mesh_dir / config.inputs.road_rule_filename
-        if not road.exists() and not walk.exists() and not road_node.exists() and not road_rule.exists():
+        road_node_maat = mesh_dir / config.inputs.road_node_maat_filename
+        road_cross_maat = mesh_dir / config.inputs.road_cross_maat_filename
+        road_node_rule = mesh_dir / config.inputs.road_node_rule_filename
+        road_cross_rule = mesh_dir / config.inputs.road_cross_rule_filename
+        if not any(
+            p.exists()
+            for p in (
+                road,
+                walk,
+                road_node,
+                road_rule,
+                road_node_maat,
+                road_cross_maat,
+                road_node_rule,
+                road_cross_rule,
+            )
+        ):
             continue
         mesh_sets.append(
             MeshInputSet(
@@ -60,6 +84,10 @@ def discover_mesh_inputs(config: AppConfig) -> List[MeshInputSet]:
                 walk=walk if walk.exists() else None,
                 road_node=road_node if road_node.exists() else None,
                 road_rule=road_rule if road_rule.exists() else None,
+                road_node_maat=road_node_maat if road_node_maat.exists() else None,
+                road_cross_maat=road_cross_maat if road_cross_maat.exists() else None,
+                road_node_rule=road_node_rule if road_node_rule.exists() else None,
+                road_cross_rule=road_cross_rule if road_cross_rule.exists() else None,
             )
         )
     return mesh_sets
@@ -72,17 +100,29 @@ def discover_inputs(config: AppConfig) -> DiscoveredInputs:
     walk_files = _existing(config.inputs.walk)
     road_node_files = _existing(config.inputs.road_node)
     road_rule_files = _existing(config.inputs.road_rule)
+    road_node_maat_files = _existing(config.inputs.road_node_maat)
+    road_cross_maat_files = _existing(config.inputs.road_cross_maat)
+    road_node_rule_files = _existing(config.inputs.road_node_rule)
+    road_cross_rule_files = _existing(config.inputs.road_cross_rule)
 
     road_files.extend(m.road for m in mesh_sets if m.road is not None)
     walk_files.extend(m.walk for m in mesh_sets if m.walk is not None)
     road_node_files.extend(m.road_node for m in mesh_sets if m.road_node is not None)
     road_rule_files.extend(m.road_rule for m in mesh_sets if m.road_rule is not None)
+    road_node_maat_files.extend(m.road_node_maat for m in mesh_sets if m.road_node_maat is not None)
+    road_cross_maat_files.extend(m.road_cross_maat for m in mesh_sets if m.road_cross_maat is not None)
+    road_node_rule_files.extend(m.road_node_rule for m in mesh_sets if m.road_node_rule is not None)
+    road_cross_rule_files.extend(m.road_cross_rule for m in mesh_sets if m.road_cross_rule is not None)
 
     return DiscoveredInputs(
         road_files=list(_dedupe_paths(road_files)),
         walk_files=list(_dedupe_paths(walk_files)),
         road_node_files=list(_dedupe_paths(road_node_files)),
         road_rule_files=list(_dedupe_paths(road_rule_files)),
+        road_node_maat_files=list(_dedupe_paths(road_node_maat_files)),
+        road_cross_maat_files=list(_dedupe_paths(road_cross_maat_files)),
+        road_node_rule_files=list(_dedupe_paths(road_node_rule_files)),
+        road_cross_rule_files=list(_dedupe_paths(road_cross_rule_files)),
         mesh_sets=mesh_sets,
     )
 
