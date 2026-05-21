@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fts"
+version = "0.1.0"
+description = "Convert local road, walking, and cycling shapefiles to OSM XML for Valhalla."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "geopandas>=0.14",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  "pyyaml>=6.0",
+  "lxml>=5.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+
+[project.scripts]
+fts-shp2osm = "fts.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
