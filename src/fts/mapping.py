@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .config import resolve_field
+from .time_domain import normalize_gdf_time_domain
+from .vehicle import apply_vehicle_restriction
 
 
 ROAD_CLASS_TO_HIGHWAY = {
@@ -146,7 +148,7 @@ def map_road_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
 
     tags.update(_speed_from_fields(row, aliases, defaults))
 
-    expectime = _clean(resolve_field(row, "EXPECTIME", aliases))
+    expectime = normalize_gdf_time_domain(resolve_field(row, "EXPECTIME", aliases))
     if expectime:
         tags["opening_date:conditional"] = expectime
         tags["source:expectime"] = expectime
@@ -188,10 +190,8 @@ def map_road_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     if ownership in {1, 3, 4, 5}:
         tags["access"] = "private" if defaults.include_private_roads else "no"
 
-    if vehicle == "0000000000000000":
-        tags["motor_vehicle"] = "no"
-    elif vehicle:
-        tags["motor_vehicle"] = "yes"
+    if getattr(defaults, "apply_vehicle_restrictions", True):
+        tags = apply_vehicle_restriction(tags, vehicle)
 
     if link_type in LINK_TYPE_SPECIAL:
         tags.update(LINK_TYPE_SPECIAL[link_type])
@@ -213,6 +213,7 @@ def map_walk_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     bicycle = _int(resolve_field(row, "BICYCLE", aliases), 0)
     bi_dir = _int(resolve_field(row, "BI_DIR", aliases), 0)
     bw_mark = _int(resolve_field(row, "BW_MARK", aliases), 0)
+    greenway = _int(resolve_field(row, "GREENWAY", aliases), 0)
     con_status = _int(resolve_field(row, "CONSTATUS", aliases), 1)
 
     highway = WALK_WF_TYPE_TO_HIGHWAY.get(wf_type, "path")
@@ -237,10 +238,13 @@ def map_walk_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     if wf_type == 9:
         tags["highway"] = "elevator"
         tags["indoor"] = "yes"
+        tags["wheelchair"] = "yes"
     if wf_type == 22:
         tags["bridge"] = "yes"
+        tags["layer"] = "1"
     if wf_type == 23:
         tags["tunnel"] = "yes"
+        tags["layer"] = "-1"
 
     if navitype == 2:
         tags["foot"] = "no"
@@ -250,10 +254,15 @@ def map_walk_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     else:
         tags["motor_vehicle"] = "no"
 
-    if bicycle in {1, 2, 3} or bw_mark in {2, 3, 4, 5} or wf_type == 24:
+    if bicycle in {1, 2, 3} or bw_mark in {2, 3, 4, 5} or wf_type == 24 or greenway > 0:
         tags["bicycle"] = "yes"
+        tags["bicycle:source"] = "WALK_LINK"
         if wf_type == 24:
             tags["highway"] = "cycleway"
+            tags["bicycle"] = "designated"
+        if greenway > 0:
+            tags["source:greenway"] = str(greenway)
+            tags["bicycle"] = "designated"
     elif bicycle in {5, 6} or bw_mark in {9, 10}:
         tags["bicycle"] = "no"
     elif bw_mark in {6, 8}:
@@ -262,6 +271,10 @@ def map_walk_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
     if bw_mark in {1, 7}:
         tags["foot"] = "yes"
         tags["bicycle"] = tags.get("bicycle", "no")
+    if bw_mark in {2, 3, 4, 5}:
+        tags["segregated"] = "yes"
+    elif bw_mark in {6, 8}:
+        tags["segregated"] = "no"
 
     if direction == 2:
         tags["oneway:foot"] = "yes"
@@ -289,5 +302,12 @@ def map_walk_tags(row: Any, aliases: Dict[str, Any], defaults: Any) -> Dict[str,
         tags["incline"] = "up"
     elif slope == 3:
         tags["incline"] = "down"
+
+    width = _clean(resolve_field(row, "WIDTH", aliases))
+    if width and width not in {"0", "0.0"}:
+        tags["width"] = width
+    surface = _clean(resolve_field(row, "SURFACE", aliases))
+    if surface:
+        tags["surface"] = surface
 
     return tags
