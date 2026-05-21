@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+out/
+data/
+valhalla_tiles/
+valhalla_tiles.tar
+*.osm.pbf
+.pytest_cache/
+.ruff_cache/
