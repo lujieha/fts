@@ -1,6 +1,8 @@
 inputs:
   road: "data/RoadSegment.shp"
   walk: "data/WALK_LINK.shp"
+  # RoadNodeRoadCross 点表，用于基于 BOUNDARY + X_COORD/Y_COORD 建立跨 mesh node 连通关系。
+  road_node: "data/RoadNodeRoadCross.shp"
   out_dir: "out"
 
 output:
@@ -21,6 +23,15 @@ geometry:
   preserve_shape_vertices: true
   simplify_tolerance_m: 0.0
 
+topology:
+  # 开启后，RoadSegment 的 FNODE/TNODE 会优先映射到 RoadNodeRoadCross 中的逻辑节点。
+  # 跨 mesh 边界节点通过 BOUNDARY 方向、邻接 mesh 和坐标匹配归并为同一个 OSM node。
+  enabled: false
+  # 规范中 X_COORD/Y_COORD 是秒；如果你的 Shapefile 已是十进制度，改为 degrees。
+  node_coordinate_unit: "seconds"
+  node_coordinate_precision: 7
+  prefer_topology_nodes: true
+
 defaults:
   road_default_speed_kph: 40
   foot_default_speed_kph: 5
@@ -36,6 +47,8 @@ field_aliases:
     ROAD_ID: ["ROAD_ID"]
     NAME_CHN: ["NAME_CHN", "NAME", "NAMECHN"]
     NAME_ENG: ["NAME_ENG"]
+    FNODE: ["FNODE", "F_NODE"]
+    TNODE: ["TNODE", "T_NODE"]
     ROAD_CLASS: ["ROAD_CLASS", "ROADCLASS"]
     DIRECTION: ["DIRECTION", "DIR"]
     MAX_SPEED: ["MAX_SPEED", "MAXSPEED"]
@@ -49,6 +62,13 @@ field_aliases:
     OVER_HEAD: ["OVER_HEAD", "OVERHEAD"]
     PAVER: ["PAVER"]
     OWNERSHIP: ["OWNERSHIP"]
+  road_node:
+    MESH: ["MESH"]
+    NODE: ["NODE"]
+    NODE_ID: ["NODE_ID", "NODEID"]
+    X_COORD: ["X_COORD", "XCOORD"]
+    Y_COORD: ["Y_COORD", "YCOORD"]
+    BOUNDARY: ["BOUNDARY"]
   walk:
     MESH: ["MESH"]
     LINK_ID: ["LINK_ID", "LINKID"]
